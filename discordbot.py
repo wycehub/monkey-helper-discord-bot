@@ -14,13 +14,17 @@ import dislash
 from aiohttp import ClientSession
 from discord import FFmpegPCMAudio
 from discord.ext import commands
+from itertools import product
 
-#intitialize bot
+
+# initialize bot
 def placeholder_prefix(*args, **kwargs):
     return "!"
 
+
 bot = commands.Bot(command_prefix=placeholder_prefix(), intents=discord.Intents.all())
 bot.remove_command('help')
+
 
 def initialize_files():
     if not os.path.exists("secrets.json"):
@@ -32,26 +36,31 @@ def initialize_files():
             "reddit_secret": "YOUR_REDDIT_SECRET",
             "reddit_user_agent": "YOUR_REDDIT_USER_AGENT"
         }
-        with open("secrets.json", "w") as file:
-            json.dump(secrets, file)
-            print("a new secrets.json file has been created for you,provide your API keys and tokens in the file and then run the script again")
+        with open("secrets.json", "w") as f:
+            json.dump(secrets, f)
+            print(
+                "a new secrets.json file has been created for you,"
+                " provide your API keys and tokens in the file and then run the script again")
         sys.exit()
     if not os.path.exists("prefixes.json"):
         default_prefixes = {str(guild.id): "!" for guild in bot.guilds}
-        with open("prefixes.json", "w") as file:
-            json.dump(default_prefixes, file)
+        with open("prefixes.json", "w") as f:
+            json.dump(default_prefixes, f)
     for guild in bot.guilds:
         filename = f"{guild.id}_movies.json"
         if not os.path.exists(filename):
-            with open(filename, "w") as file:
-                json.dump({"watch": [], "watched": []}, file)
+            with open(filename, "w") as f:
+                json.dump({"watch": [], "watched": []}, f)
+
 
 initialize_files()
 
+
 def get_prefix(bot, message):
-    with open("prefixes.json", "r") as file:
-        prefixes = json.load(file)
+    with open("prefixes.json", "r") as f:
+        prefixes = json.load(f)
     return prefixes.get(str(message.guild.id), "!")
+
 
 with open("secrets.json", "r") as file:
     secrets = json.load(file)
@@ -62,18 +71,20 @@ with open("secrets.json", "r") as file:
     REDDIT_SECRET = secrets["reddit_secret"]
     REDDIT_USER_AGENT = secrets["reddit_user_agent"]
 
+
 async def set_bot_activity():
     guilds_prefixes = {}
-    with open("prefixes.json", "r") as file:
-        prefixes = json.load(file)
+    with open("prefixes.json", "r") as f:
+        prefixes = json.load(f)
 
     for guild in bot.guilds:
         guild_prefix = prefixes.get(str(guild.id), "!")
         guilds_prefixes[str(guild.id)] = guild_prefix
 
-    for guild, prefix in guilds_prefixes.items():
-        activity = discord.Game(name=f"listening for {prefix}help")
+    for guild, pref in guilds_prefixes.items():
+        activity = discord.Game(name=f"listening for {pref}help")
         await bot.change_presence(activity=activity)
+
 
 @bot.event
 async def on_ready():
@@ -89,12 +100,14 @@ async def on_ready():
     for guild in bot.guilds:
         print(f' - {guild.name} (id: {guild.id})')
         initialize_files()
-    
+
     await set_bot_activity()
+
 
 @bot.event
 async def on_disconnect():
     await bot.session.close()
+
 
 @bot.event
 async def on_guild_join(guild):
@@ -104,6 +117,7 @@ async def on_guild_join(guild):
     with open("prefixes.json", "w") as file:
         json.dump(prefixes, file)
 
+
 @bot.event
 async def on_guild_remove(guild):
     with open("prefixes.json", "r") as file:
@@ -112,9 +126,11 @@ async def on_guild_remove(guild):
     with open("prefixes.json", "w") as file:
         json.dump(prefixes, file)
 
+
 # help
 @bot.command()
 async def help(ctx, command: str = None):
+    global embed
     prefix = get_prefix(bot, ctx.message)
     if not command:
         embed = discord.Embed(title="help", description="list of available commands", color=0x00BFFF)
@@ -137,16 +153,16 @@ async def help(ctx, command: str = None):
     else:
         command = command.lower()
         if command == "a" or command == "audio":
-            help_text = f"**{prefix}a play [url]** - play audio from a YouTube URL\n"\
-                        f"**{prefix}a stop** - stop playing audio\n"\
-                        f"**{prefix}a skip** - skip the current audio\n"\
-                        f"**{prefix}a queue** - show the audio queue\n"\
+            help_text = f"**{prefix}a play [url]** - play audio from a YouTube URL\n" \
+                        f"**{prefix}a stop** - stop playing audio\n" \
+                        f"**{prefix}a skip** - skip the current audio\n" \
+                        f"**{prefix}a queue** - show the audio queue\n" \
                         f"**{prefix}a remove [index]** - remove a song from the queue"
         elif command == "m" or command == "movie":
-            help_text = f"**{prefix}m add [title]** - look for the title and add it\n"\
-                        f"**{prefix}m watched [title]** - add a movie to the watched list\n"\
-                        f"**{prefix}m remove [title]** - remove a title from the lists\n"\
-                        f"**{prefix}m list [title]** - display watch and watched list\n"\
+            help_text = f"**{prefix}m add [title]** - look for the title and add it\n" \
+                        f"**{prefix}m watched [title]** - add a movie to the watched list\n" \
+                        f"**{prefix}m remove [title]** - remove a title from the lists\n" \
+                        f"**{prefix}m list [title]** - display watch and watched list\n" \
                         f"**{prefix}m random** - select a random movie from the watch list"
         elif command == "monkey":
             help_text = f"**{prefix}monkey** - post a random monkey image"
@@ -158,6 +174,7 @@ async def help(ctx, command: str = None):
             help_text = "invalid command name. type `!help` for the list of available commands"
             embed = discord.Embed(title=f"Help: {command}", description=help_text, color=0x00BFFF)
     await ctx.send(embed=embed)
+
 
 # monkey
 async def fetch_reddit_monkey():
@@ -174,11 +191,13 @@ async def fetch_reddit_monkey():
                 'Authorization': f"Bearer {access_token}",
                 'User-Agent': 'DiscordBot/1.0'
             }
-            async with session.get('https://oauth.reddit.com/r/monke/hot', headers=headers, params={'limit': 100}) as response:
+            async with session.get('https://oauth.reddit.com/r/monke/hot', headers=headers,
+                                   params={'limit': 100}) as response:
                 data = await response.json()
                 posts = data['data']['children']
                 image_posts = [post for post in posts if post['data']['post_hint'] in ('image', 'rich:video')]
                 return random.choice(image_posts)['data']['url']
+
 
 @bot.command()
 async def monkey(ctx):
@@ -203,16 +222,40 @@ async def monkey(ctx):
     else:
         await ctx.send("unable to fetch monkey image/gif")
 
+
+# pd3 bruteforce
+@bot.command()
+async def combos(ctx, numbers: str):
+    def all_combinations(input_numbers):
+        combinations = product(input_numbers, repeat=4)
+        generate_combos = ["".join(comb) for comb in combinations if all(num in comb for num in input_numbers)]
+        return sorted(generate_combos)
+
+    if len(numbers) < 1 or len(numbers) > 4:
+        await ctx.send("Please enter between 1 to 4 numbers.")
+        return
+
+    for n in numbers:
+        if not n.isdigit() or int(n) < 0 or int(n) > 9:
+            await ctx.send("Invalid input. Please enter numbers between 0 and 9.")
+            return
+
+    valid_combos = all_combinations(list(numbers))
+    await ctx.send(" ".join(valid_combos))
+
+
 # rng
 @bot.command()
 async def rng(ctx, max_number: int = 100):
     random_number = random.randint(1, max_number)
     await ctx.send(f"random number between 1 and {max_number}: {random_number}")
 
+
 # prefix
 async def update_bot_activity(ctx, new_prefix):
     activity = discord.Game(name=f"listening for {new_prefix}help")
     await bot.change_presence(activity=activity)
+
 
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -225,10 +268,12 @@ async def prefix(ctx, new_prefix):
     await ctx.send(f"prefix changed to: {new_prefix}")
     await update_bot_activity(ctx, new_prefix)
 
+
 @prefix.error
 async def prefix_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
         await ctx.send("you don't have the required permissions to change the prefix")
+
 
 # youtube audio
 YDL_OPTIONS = {
@@ -247,6 +292,7 @@ current_song = None
 is_playing = False
 inactive_vc_timers = {}
 
+
 async def check_inactivity_and_leave(ctx):
     guild_id = ctx.guild.id
     while True:
@@ -258,6 +304,7 @@ async def check_inactivity_and_leave(ctx):
             inactive_vc_timers[guild_id].cancel()
             del inactive_vc_timers[guild_id]
             break
+
 
 async def connect_to_voice_channel(ctx):
     voice_channel = ctx.author.voice.channel
@@ -272,6 +319,7 @@ async def connect_to_voice_channel(ctx):
     else:
         inactive_vc_timers[guild_id] = asyncio.create_task(check_inactivity_and_leave(ctx))
     return voice_client
+
 
 async def get_video_info(search, is_playlist=False):
     ytdl = yt_dlp.YoutubeDL(YDL_OPTIONS)
@@ -307,6 +355,7 @@ async def get_video_info(search, is_playlist=False):
             "duration": info["duration"],
         }
 
+
 async def play_audio(ctx):
     if not queue:
         global is_playing
@@ -331,6 +380,7 @@ async def play_audio(ctx):
     voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(play_audio(ctx), bot.loop))
     await ctx.send(f"now playing: {title}")
 
+
 async def process_queue(ctx):
     global is_playing
     if not is_playing:
@@ -338,10 +388,12 @@ async def process_queue(ctx):
         voice_client = await connect_to_voice_channel(ctx)
         await play_audio(ctx)
 
+
 @bot.group(name="a")
 async def audio(ctx):
     if ctx.invoked_subcommand is None:
         await ctx.send("use a valid subcommand: play, stop, skip, queue, remove")
+
 
 @audio.command(name="play")
 async def a_play(ctx, *, search: str):
@@ -364,16 +416,19 @@ async def a_play(ctx, *, search: str):
     else:
         await ctx.send(f"added to queue: {title}")
 
+
 @audio.command(name="stop")
 async def a_stop(ctx):
     if ctx.voice_client:
         ctx.voice_client.stop()
         queue.clear()
 
+
 @audio.command(name="skip")
 async def a_skip(ctx):
     if ctx.voice_client:
         ctx.voice_client.stop()
+
 
 @audio.command(name="queue")
 async def a_queue(ctx):
@@ -381,17 +436,19 @@ async def a_queue(ctx):
         await ctx.send("there are no songs in the queue")
         return
     else:
-        await ctx.send(f"currently playing: {current_song['title']} [{str(datetime.timedelta(seconds=current_song['duration']))}]",)
-        embed = discord.Embed(title="queue", color=discord.Color.green())
+        await ctx.send(
+            f"currently playing: {current_song['title']} [{str(datetime.timedelta(seconds=current_song['duration']))}]", )
+        embedded = discord.Embed(title="queue", color=discord.Color.green())
         for idx, song in enumerate(queue, start=1):
             title = song[1]
             duration = song[2]
-            embed.add_field(
+            embedded.add_field(
                 name=f"{idx}. {title} [{str(datetime.timedelta(seconds=duration))}]",
                 value="\u200b",
                 inline=False,
             )
-        await ctx.send(embed=embed)
+        await ctx.send(embed=embedded)
+
 
 @audio.command(name="remove")
 async def a_remove(ctx, index: int):
@@ -401,6 +458,7 @@ async def a_remove(ctx, index: int):
     except IndexError:
         await ctx.send("invalid index")
 
+
 # movie library
 def add_movie_to_list(ctx, movie_title: str, list_name: str):
     with open(f"{ctx.guild.id}_movies.json", "r") as file:
@@ -408,6 +466,7 @@ def add_movie_to_list(ctx, movie_title: str, list_name: str):
     movie_list[list_name].append(movie_title)
     with open(f"{ctx.guild.id}_movies.json", "w") as file:
         json.dump(movie_list, file)
+
 
 def remove_movie_from_list(ctx, movie_title: str, list_name: str):
     with open(f"{ctx.guild.id}_movies.json", "r") as file:
@@ -425,9 +484,11 @@ def move_movie_to_watched_list(ctx, movie_title: str):
     remove_movie_from_list(ctx, movie_title, "watch")
     add_movie_to_list(ctx, movie_title, "watched")
 
+
 def move_movie_to_watch_list(ctx, movie_title: str):
     remove_movie_from_list(ctx, movie_title, "watched")
     add_movie_to_list(ctx, movie_title, "watch")
+
 
 def generate_movie_embed(movie_data: dict):
     embed = discord.Embed(title=movie_data["Title"], color=0x00BFFF)
@@ -441,6 +502,7 @@ def generate_movie_embed(movie_data: dict):
     embed.add_field(name="Plot", value=movie_data["Plot"], inline=False)
     return embed
 
+
 def get_random_movie(ctx):
     with open(f"{ctx.guild.id}_movies.json", "r") as file:
         movie_list = json.load(file)
@@ -449,6 +511,7 @@ def get_random_movie(ctx):
         return random.choice(watch_list)
     else:
         return None
+
 
 async def get_movie_data(title: str):
     encoded_title = urllib.parse.quote(title)
@@ -469,9 +532,12 @@ async def get_movie_data(title: str):
             else:
                 return None
 
+
 async def wait_for_reaction(bot, message, author, valid_reactions):
     def check(reaction, user):
-        return user == author and str(reaction.emoji) in valid_reactions and reaction.message.id == message.id and not user.bot
+        return user == author and str(
+            reaction.emoji) in valid_reactions and reaction.message.id == message.id and not user.bot
+
     try:
         reaction, user = await bot.wait_for("reaction_add", timeout=60.0, check=check)
     except asyncio.TimeoutError:
@@ -479,10 +545,12 @@ async def wait_for_reaction(bot, message, author, valid_reactions):
     else:
         return str(reaction.emoji)
 
+
 @bot.group(name="m")
 async def movie(ctx):
     if ctx.invoked_subcommand is None:
         await ctx.send("please use a valid subcommand: add, remove, watched, list")
+
 
 @movie.command(name="add")
 async def m_add(ctx, *, title: str):
@@ -500,7 +568,8 @@ async def m_add(ctx, *, title: str):
         if already_in_watched:
             embed = generate_movie_embed(movie_data)
             message = await ctx.send(embed=embed)
-            message = await ctx.send("this movie is already in the watched list. do you want to add it back to the watch list?")
+            message = await ctx.send(
+                "this movie is already in the watched list. do you want to add it back to the watch list?")
             for emoji in ("✅", "❌"):
                 await message.add_reaction(emoji)
             reaction = await wait_for_reaction(bot, message, ctx.author, ["✅", "❌"])
@@ -525,12 +594,14 @@ async def m_add(ctx, *, title: str):
             await ctx.send("cancelled")
     else:
         await ctx.send("movie not found")
-  
+
+
 @movie.command(name="remove")
 async def m_remove(ctx, *, title: str):
     remove_movie_from_list(ctx, title, "watch")
     remove_movie_from_list(ctx, title, "watched")
     await ctx.send(f"removed {title}")
+
 
 @movie.command(name="watched")
 async def m_watched(ctx, *, title: str):
@@ -540,6 +611,7 @@ async def m_watched(ctx, *, title: str):
         await ctx.send(f"added {movie_data['Title']} to the watched list")
     else:
         await ctx.send("movie not found")
+
 
 @movie.command(name="list")
 async def m_list(ctx):
@@ -552,6 +624,7 @@ async def m_list(ctx):
     response = f"**watch list:**\n{watch_list_str}\n\n**watched List:**\n{watched_list_str}"
     await ctx.send(response)
 
+
 @movie.command(name="random")
 async def m_random(ctx):
     random_movie = get_random_movie(ctx)
@@ -559,5 +632,6 @@ async def m_random(ctx):
         await ctx.send(f"Random movie from the watch list: {random_movie}")
     else:
         await ctx.send("The watch list is empty.")
+
 
 bot.run(TOKEN)
