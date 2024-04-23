@@ -3,4 +3,4 @@ yt-dlp
 asyncio
 aiohttp
 asyncpraw
-dislash
+dislash.py
